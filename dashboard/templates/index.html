@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Predictive Maintenance Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --bg2: #171b26;
+    --bg3: #1e2435;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #e8ecf4;
+    --text2: #8892a4;
+    --text3: #5a6478;
+    --green: #22c55e;
+    --green-bg: rgba(34,197,94,0.12);
+    --amber: #f59e0b;
+    --amber-bg: rgba(245,158,11,0.12);
+    --red: #ef4444;
+    --red-bg: rgba(239,68,68,0.12);
+    --blue: #3b82f6;
+    --blue-bg: rgba(59,130,246,0.12);
+    --accent: #6366f1;
+    --accent-bg: rgba(99,102,241,0.15);
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+
+  body {
+    font-family: 'DM Sans', 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0;
+    width: 220px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 0;
+    z-index: 100;
+  }
+  .sidebar-logo {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-logo .logo-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--accent-bg);
+    border: 1px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; margin-bottom: 10px;
+  }
+  .sidebar-logo h1 { font-size: 13px; font-weight: 600; color: var(--text); }
+  .sidebar-logo p  { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+  .nav-section { padding: 12px 12px 4px; font-size: 10px; font-weight: 600; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 16px; margin: 1px 8px;
+    border-radius: 8px; cursor: pointer;
+    color: var(--text2); font-size: 13px; font-weight: 500;
+    transition: all 0.15s;
+  }
+  .nav-item:hover { background: var(--bg3); color: var(--text); }
+  .nav-item.active { background: var(--accent-bg); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.25); }
+  .nav-icon { font-size: 15px; width: 18px; text-align: center; }
+
+  .sidebar-footer {
+    margin-top: auto; padding: 14px 16px;
+    border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--text3);
+  }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 6px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* ── Main layout ── */
+  .main {
+    margin-left: 220px;
+    padding: 0;
+    min-height: 100vh;
+  }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(15,17,23,0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .topbar-title { font-size: 16px; font-weight: 600; }
+  .topbar-sub   { font-size: 12px; color: var(--text3); margin-top: 1px; }
+  .topbar-right { display: flex; gap: 10px; align-items: center; }
+
+  .btn {
+    padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border2);
+    background: var(--bg3); color: var(--text); font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn:hover { background: var(--bg2); border-color: var(--border2); }
+  .btn-accent { background: var(--accent-bg); border-color: var(--accent); color: #a5b4fc; }
+  .btn-accent:hover { background: rgba(99,102,241,0.25); }
+
+  .content { padding: 24px 28px; }
+
+  /* ── KPI Cards ── */
+  .kpi-grid {
+    display: grid; grid-template-columns: repeat(4, minmax(0,1fr));
+    gap: 14px; margin-bottom: 24px;
+  }
+  .kpi-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 18px 20px;
+    transition: border-color 0.2s;
+  }
+  .kpi-card:hover { border-color: var(--border2); }
+  .kpi-label { font-size: 12px; color: var(--text3); font-weight: 500; margin-bottom: 6px; }
+  .kpi-value { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+  .kpi-sub   { font-size: 11px; color: var(--text3); margin-top: 4px; }
+  .kpi-card.danger  .kpi-value { color: var(--red); }
+  .kpi-card.warning .kpi-value { color: var(--amber); }
+  .kpi-card.success .kpi-value { color: var(--green); }
+  .kpi-card.info    .kpi-value { color: #a5b4fc; }
+
+  /* ── Tab panel ── */
+  .tab-bar { display: flex; gap: 4px; margin-bottom: 20px; }
+  .tab {
+    padding: 8px 16px; border-radius: 8px; cursor: pointer;
+    font-size: 13px; font-weight: 500; color: var(--text2);
+    border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+  .tab:hover { background: var(--bg3); color: var(--text); }
+  .tab.active { background: var(--accent-bg); color: #a5b4fc; border-color: rgba(99,102,241,0.3); }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── Two-column grid ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .three-col { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; }
+
+  /* ── Panel card ── */
+  .panel {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 20px;
+  }
+  .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .panel-title  { font-size: 14px; font-weight: 600; color: var(--text); }
+  .panel-sub    { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+  /* ── Fleet table ── */
+  .fleet-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .fleet-row:last-child { border-bottom: none; }
+  .fleet-id { font-size: 12px; font-weight: 600; color: var(--text2); min-width: 80px; }
+  .fleet-bar-wrap { flex: 1; height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+  .fleet-bar { height: 100%; border-radius: 3px; transition: width 0.8s cubic-bezier(0.4,0,0.2,1); }
+  .fleet-pct  { font-size: 12px; font-weight: 700; min-width: 38px; text-align: right; }
+  .fleet-badge {
+    font-size: 10px; font-weight: 600; padding: 3px 8px;
+    border-radius: 20px; min-width: 60px; text-align: center;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .badge-normal   { background: var(--green-bg);  color: var(--green); }
+  .badge-warning  { background: var(--amber-bg);  color: var(--amber); }
+  .badge-critical { background: var(--red-bg);    color: var(--red);   }
+  .fleet-rul { font-size: 11px; color: var(--text3); min-width: 52px; }
+
+  /* ── Sensor grid ── */
+  .sensor-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .sensor-card {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 14px;
+  }
+  .sensor-name { font-size: 11px; color: var(--text3); margin-bottom: 4px; }
+  .sensor-val  { font-size: 17px; font-weight: 700; }
+  .sensor-bar-wrap { height: 3px; background: var(--bg2); border-radius: 2px; margin-top: 8px; }
+  .sensor-bar-fill { height: 100%; border-radius: 2px; }
+
+  /* ── Alert log ── */
+  .alert-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .alert-item:last-child { border-bottom: none; }
+  .alert-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+  .alert-time { font-size: 11px; color: var(--text3); min-width: 44px; margin-top: 1px; }
+  .alert-msg  { font-size: 12px; color: var(--text); line-height: 1.4; }
+  .alert-sub  { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+  /* ── Metric rows ── */
+  .metric-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 0; border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-row .label { color: var(--text2); }
+  .metric-row .val   { font-weight: 700; }
+  .val-good   { color: var(--green); }
+  .val-ok     { color: var(--amber); }
+  .val-info   { color: #a5b4fc; }
+
+  /* ── Confusion matrix ── */
+  .cm-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+  .cm-cell {
+    border-radius: 8px; padding: 14px 10px; text-align: center;
+  }
+  .cm-cell .cm-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.8; }
+  .cm-cell .cm-val { font-size: 24px; font-weight: 800; margin: 4px 0; }
+  .cm-cell .cm-desc{ font-size: 10px; opacity: 0.7; }
+  .cm-tn { background: var(--green-bg); color: var(--green); }
+  .cm-fp { background: var(--amber-bg); color: var(--amber); }
+  .cm-fn { background: var(--red-bg);   color: var(--red);   }
+  .cm-tp { background: var(--blue-bg);  color: var(--blue);  }
+
+  /* ── Selector controls ── */
+  .ctrl-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .ctrl-label { font-size: 12px; color: var(--text3); }
+  select, input[type=range] {
+    background: var(--bg3); border: 1px solid var(--border2);
+    color: var(--text); border-radius: 7px; padding: 6px 10px;
+    font-size: 12px; outline: none; cursor: pointer;
+  }
+  select:focus { border-color: var(--accent); }
+  input[type=range] { padding: 4px; accent-color: var(--accent); }
+
+  canvas { max-height: 220px; }
+
+  /* ── Loading state ── */
+  .loading { color: var(--text3); font-size: 13px; padding: 20px 0; text-align: center; }
+
+  /* ── Scrollable fleet ── */
+  .fleet-scroll { max-height: 440px; overflow-y: auto; }
+  .fleet-scroll::-webkit-scrollbar { width: 4px; }
+  .fleet-scroll::-webkit-scrollbar-track { background: transparent; }
+  .fleet-scroll::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 2px; }
+
+  @media (max-width: 900px) {
+    .sidebar { width: 60px; }
+    .sidebar-logo h1, .sidebar-logo p, .nav-item span, .nav-section { display: none; }
+    .main { margin-left: 60px; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .two-col, .three-col { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">⚙</div>
+    <h1>PredictMaint AI</h1>
+    <p>Industrial IoT Monitor</p>
+  </div>
+
+  <div class="nav-section">Monitor</div>
+  <div class="nav-item active" onclick="switchTab('fleet', this)">
+    <span class="nav-icon">◉</span><span>Fleet Status</span>
+  </div>
+  <div class="nav-item" onclick="switchTab('sensors', this)">
+    <span class="nav-icon">📡</span><span>Live Sensors</span>
+  </div>
+  <div class="nav-item" onclick="switchTab('rul', this)">
+    <span class="nav-icon">📈</span><span>RUL Curves</span>
+  </div>
+
+  <div class="nav-section">Analysis</div>
+  <div class="nav-item" onclick="switchTab('model', this)">
+    <span class="nav-icon">🧠</span><span>Model Results</span>
+  </div>
+  <div class="nav-item" onclick="switchTab('alerts', this)">
+    <span class="nav-icon">🔔</span><span>Alert Log</span>
+  </div>
+
+  <div class="sidebar-footer">
+    <span class="status-dot"></span>System online
+  </div>
+</nav>
+
+<!-- ── Main ── -->
+<div class="main">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Predictive Maintenance Dashboard</div>
+      <div class="topbar-sub">NASA CMAPSS Turbofan Engine — Real Model Output</div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn" onclick="refreshAll()">↻ Refresh</button>
+      <button class="btn btn-accent" onclick="window.open('/api/fleet')">View API ↗</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- KPI Row -->
+    <div class="kpi-grid">
+      <div class="kpi-card info">
+        <div class="kpi-label">Engines Monitored</div>
+        <div class="kpi-value" id="kpi-engines">—</div>
+        <div class="kpi-sub">Active units</div>
+      </div>
+      <div class="kpi-card danger">
+        <div class="kpi-label">Critical Alerts</div>
+        <div class="kpi-value" id="kpi-critical">—</div>
+        <div class="kpi-sub">Immediate action needed</div>
+      </div>
+      <div class="kpi-card success">
+        <div class="kpi-label">Model Accuracy</div>
+        <div class="kpi-value" id="kpi-accuracy">—</div>
+        <div class="kpi-sub">Random Forest classifier</div>
+      </div>
+      <div class="kpi-card warning">
+        <div class="kpi-label">Avg Failure Prob</div>
+        <div class="kpi-value" id="kpi-avgprob">—</div>
+        <div class="kpi-sub">Fleet average</div>
+      </div>
+    </div>
+
+    <!-- ── TAB: Fleet ── -->
+    <div id="tab-fleet" class="tab-panel active">
+      <div class="three-col">
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Engine Fleet — Failure Probability</div>
+              <div class="panel-sub">Sorted by risk level (highest first)</div>
+            </div>
+          </div>
+          <div class="fleet-scroll" id="fleet-list">
+            <div class="loading">Loading engine data...</div>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:18px">
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Class Distribution</div>
+            </div>
+            <canvas id="class-chart" height="160"></canvas>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Risk Overview</div>
+            </div>
+            <canvas id="risk-chart" height="140"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: Sensors ── -->
+    <div id="tab-sensors" class="tab-panel">
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Live Sensor Readings</div>
+          </div>
+          <div class="ctrl-row">
+            <span class="ctrl-label">Engine:</span>
+            <select id="sensor-engine-sel" onchange="loadSensors()"></select>
+            <span class="ctrl-label">Cycle:</span>
+            <input type="range" id="sensor-cycle" min="1" max="300" step="1" value="100" oninput="onCycleSlide(this.value)">
+            <span id="sensor-cycle-val" style="font-size:12px;color:var(--text3);min-width:30px">100</span>
+          </div>
+          <div class="sensor-grid" id="sensor-grid">
+            <div class="loading" style="grid-column:span 2">Select an engine above</div>
+          </div>
+          <div id="sensor-alert-bar" style="margin-top:14px;padding:12px 14px;border-radius:8px;font-size:13px;background:var(--bg3);border:1px solid var(--border)">
+            —
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Sensor Trend</div>
+          </div>
+          <canvas id="sensor-trend-chart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: RUL ── -->
+    <div id="tab-rul" class="tab-panel">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Remaining Useful Life — Degradation Curve</div>
+            <div class="panel-sub">Actual RUL vs model-predicted failure probability over time</div>
+          </div>
+          <div class="ctrl-row" style="margin:0">
+            <span class="ctrl-label">Engine:</span>
+            <select id="rul-engine-sel" onchange="loadRUL()"></select>
+          </div>
+        </div>
+        <canvas id="rul-chart" style="max-height:320px"></canvas>
+      </div>
+    </div>
+
+    <!-- ── TAB: Model ── -->
+    <div id="tab-model" class="tab-panel">
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Confusion Matrix</div>
+            <div class="panel-sub">Rows = Actual, Columns = Predicted</div>
+          </div>
+          <div class="cm-wrap" id="cm-grid">
+            <div class="loading" style="grid-column:span 2">Loading...</div>
+          </div>
+          <div style="margin-top:18px">
+            <div class="panel-title" style="margin-bottom:10px">Performance Metrics</div>
+            <div id="metrics-list"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Top 10 Feature Importance</div>
+            <div class="panel-sub">Which sensor signals matter most</div>
+          </div>
+          <canvas id="fi-chart" style="max-height:280px"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: Alerts ── -->
+    <div id="tab-alerts" class="tab-panel">
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Active Alert Log</div>
+            <div class="panel-sub">Engines above 50% failure probability</div>
+          </div>
+          <div id="alert-log"><div class="loading">Loading alerts...</div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Failure Probability Distribution</div>
+          </div>
+          <canvas id="prob-dist-chart"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script>
+// ── State ──
+let fleetData = [];
+let rulChart = null, fiChart = null, classChart = null, riskChart = null, sensorTrendChart = null, probDistChart = null;
+let sensorDebounce = null;
+
+// ── Tab switching ──
+function switchTab(name, el) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'model')  loadModelMetrics();
+  if (name === 'rul')    loadRUL();
+  if (name === 'alerts') loadAlerts();
+  if (name === 'sensors') loadSensors();
+}
+
+// ── Fetch helpers ──
+async function fetchJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+// ── On load ──
+async function refreshAll() {
+  await loadSummary();
+  await loadFleet();
+}
+
+async function loadSummary() {
+  try {
+    const d = await fetchJSON('/api/summary');
+    document.getElementById('kpi-engines').textContent  = d.n_engines;
+    document.getElementById('kpi-critical').textContent = d.n_critical;
+    document.getElementById('kpi-accuracy').textContent = d.accuracy + '%';
+    document.getElementById('kpi-avgprob').textContent  = d.avg_prob + '%';
+  } catch(e) { console.error('summary:', e); }
+}
+
+async function loadFleet() {
+  try {
+    fleetData = await fetchJSON('/api/fleet');
+
+    // Fleet list
+    const el = document.getElementById('fleet-list');
+    el.innerHTML = fleetData.map(e => {
+      const pct   = e.fail_prob;
+      const color = e.status === 'critical' ? 'var(--red)' : e.status === 'warning' ? 'var(--amber)' : 'var(--green)';
+      return `<div class="fleet-row">
+        <span class="fleet-id">Engine #${String(e.unit_id).padStart(3,'0')}</span>
+        <div class="fleet-bar-wrap"><div class="fleet-bar" style="width:${pct}%;background:${color}"></div></div>
+        <span class="fleet-pct" style="color:${color}">${pct}%</span>
+        <span class="fleet-badge badge-${e.status}">${e.label}</span>
+        <span class="fleet-rul">RUL: ${e.rul}c</span>
+      </div>`;
+    }).join('');
+
+    // Populate engine selects
+    const engines = fleetData.map(e => e.unit_id);
+    ['sensor-engine-sel', 'rul-engine-sel'].forEach(id => {
+      const sel = document.getElementById(id);
+      sel.innerHTML = engines.map(uid =>
+        `<option value="${uid}">Engine #${String(uid).padStart(3,'0')}</option>`
+      ).join('');
+    });
+
+    drawClassChart();
+    drawRiskChart(fleetData);
+  } catch(e) {
+    document.getElementById('fleet-list').innerHTML = `<div class="loading" style="color:var(--red)">Error: ${e.message}. Make sure main.py ran first.</div>`;
+  }
+}
+
+function drawClassChart() {
+  fetchJSON('/api/class_dist').then(d => {
+    if (classChart) classChart.destroy();
+    const ctx = document.getElementById('class-chart').getContext('2d');
+    classChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Normal (0)', 'Failure (1)'],
+        datasets: [{
+          data: [d.normal, d.failure],
+          backgroundColor: ['rgba(34,197,94,0.7)', 'rgba(239,68,68,0.7)'],
+          borderColor:     ['#22c55e', '#ef4444'],
+          borderWidth: 1, borderRadius: 6,
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#8892a4', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+          y: { ticks: { color: '#8892a4', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+        }
+      }
+    });
+  });
+}
+
+function drawRiskChart(data) {
+  const counts = { Normal: 0, Warning: 0, Critical: 0 };
+  data.forEach(e => {
+    if (e.status === 'critical') counts.Critical++;
+    else if (e.status === 'warning') counts.Warning++;
+    else counts.Normal++;
+  });
+  if (riskChart) riskChart.destroy();
+  const ctx = document.getElementById('risk-chart').getContext('2d');
+  riskChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Normal', 'Warning', 'Critical'],
+      datasets: [{
+        data: [counts.Normal, counts.Warning, counts.Critical],
+        backgroundColor: ['rgba(34,197,94,0.8)', 'rgba(245,158,11,0.8)', 'rgba(239,68,68,0.8)'],
+        borderWidth: 0, hoverOffset: 6,
+      }]
+    },
+    options: {
+      cutout: '68%',
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#8892a4', font: { size: 11 }, padding: 12 } }
+      }
+    }
+  });
+}
+
+// ── RUL tab ──
+let rulDebounce = null;
+function loadRUL() {
+  clearTimeout(rulDebounce);
+  rulDebounce = setTimeout(async () => {
+    const id = document.getElementById('rul-engine-sel').value;
+    if (!id) return;
+    try {
+      const d = await fetchJSON(`/api/rul/${id}`);
+      drawRULChart(d);
+    } catch(e) { console.error('rul:', e); }
+  }, 100);
+}
+
+function drawRULChart(d) {
+  if (rulChart) rulChart.destroy();
+  const ctx = document.getElementById('rul-chart').getContext('2d');
+  const threshold = new Array(d.cycles.length).fill(30);
+  const alertLine = new Array(d.cycles.length).fill(0.5);
+
+  rulChart = new Chart(ctx, {
+    data: {
+      labels: d.cycles,
+      datasets: [
+        {
+          type: 'line', label: 'Actual RUL (cycles)',
+          data: d.ruls, borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59,130,246,0.08)',
+          borderWidth: 2.5, fill: true, tension: 0.3, pointRadius: 0,
+          yAxisID: 'y1',
+        },
+        {
+          type: 'line', label: 'Failure Probability',
+          data: d.probs, borderColor: '#ef4444',
+          backgroundColor: 'rgba(239,68,68,0.08)',
+          borderWidth: 2.5, fill: true, tension: 0.3, pointRadius: 0,
+          yAxisID: 'y2',
+        },
+        {
+          type: 'line', label: 'Danger threshold (RUL=30)',
+          data: threshold, borderColor: 'rgba(245,158,11,0.6)',
+          borderWidth: 1.5, borderDash: [6,4], fill: false, pointRadius: 0,
+          yAxisID: 'y1',
+        },
+        {
+          type: 'line', label: 'Alert threshold (50%)',
+          data: alertLine, borderColor: 'rgba(239,68,68,0.5)',
+          borderWidth: 1.5, borderDash: [6,4], fill: false, pointRadius: 0,
+          yAxisID: 'y2',
+        },
+      ]
+    },
+    options: {
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#8892a4', font: { size: 11 }, padding: 12 } }
+      },
+      scales: {
+        x:  { ticks: { color: '#8892a4', font: {size:11}, maxTicksLimit: 10 }, grid: { color:'rgba(255,255,255,0.04)' }, title: { display:true, text:'Cycle', color:'#5a6478' } },
+        y1: { position:'left',  min:0, ticks: { color:'#3b82f6', font:{size:11} }, grid:{ color:'rgba(255,255,255,0.04)' }, title:{ display:true, text:'RUL', color:'#3b82f6' } },
+        y2: { position:'right', min:0, max:1, ticks: { color:'#ef4444', font:{size:11} }, grid:{ drawOnChartArea:false }, title:{ display:true, text:'Fail Prob', color:'#ef4444' } },
+      }
+    }
+  });
+}
+
+// ── Sensors tab ──
+function onCycleSlide(val) {
+  document.getElementById('sensor-cycle-val').textContent = val;
+  clearTimeout(sensorDebounce);
+  sensorDebounce = setTimeout(loadSensors, 120);
+}
+
+async function loadSensors() {
+  const id    = document.getElementById('sensor-engine-sel').value;
+  const cycle = document.getElementById('sensor-cycle').value;
+  if (!id) return;
+  try {
+    const d = await fetchJSON(`/api/sensors/${id}/${cycle}`);
+    renderSensorGrid(d);
+    renderSensorAlert(d);
+    drawSensorTrend(id);
+  } catch(e) { console.error('sensors:', e); }
+}
+
+function renderSensorGrid(d) {
+  const grid = document.getElementById('sensor-grid');
+  grid.innerHTML = d.sensors.map(s => {
+    const pct   = Math.min(100, Math.round(parseFloat(s.value) * 100));
+    const warn  = pct > 70;
+    const color = pct > 80 ? 'var(--red)' : pct > 60 ? 'var(--amber)' : 'var(--green)';
+    return `<div class="sensor-card">
+      <div class="sensor-name">${s.name}</div>
+      <div class="sensor-val" style="color:${color}">${s.value}</div>
+      <div class="sensor-bar-wrap"><div class="sensor-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function renderSensorAlert(d) {
+  const p   = d.fail_prob;
+  const bar = document.getElementById('sensor-alert-bar');
+  let color, icon, msg, action;
+  if (p >= 80) {
+    color = 'var(--red-bg)'; icon = '●'; msg = 'CRITICAL';
+    action = 'Immediate maintenance required — failure imminent!';
+  } else if (p >= 50) {
+    color = 'var(--amber-bg)'; icon = '◉'; msg = 'WARNING';
+    action = `Schedule maintenance within ${d.rul} cycles`;
+  } else {
+    color = 'var(--green-bg)'; icon = '○'; msg = 'NORMAL';
+    action = `Machine healthy — estimated ${d.rul} cycles remaining`;
+  }
+  bar.style.background = color;
+  bar.innerHTML = `<span style="font-weight:700">${icon} ${msg}</span> &nbsp;|&nbsp; Failure probability: <strong>${p}%</strong> &nbsp;|&nbsp; ${action}`;
+}
+
+async function drawSensorTrend(engineId) {
+  try {
+    const d = await fetchJSON(`/api/rul/${engineId}`);
+    if (sensorTrendChart) sensorTrendChart.destroy();
+    const ctx = document.getElementById('sensor-trend-chart').getContext('2d');
+    sensorTrendChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: d.cycles,
+        datasets: [{
+          label: 'Failure Probability',
+          data: d.probs, borderColor: '#ef4444',
+          backgroundColor: 'rgba(239,68,68,0.1)',
+          borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0,
+        }]
+      },
+      options: {
+        plugins: { legend: { labels: { color:'#8892a4', font:{size:11} } } },
+        scales: {
+          x: { ticks: { color:'#8892a4', font:{size:10}, maxTicksLimit:8 }, grid:{ color:'rgba(255,255,255,0.04)' } },
+          y: { min:0, max:1, ticks:{ color:'#8892a4', font:{size:10} }, grid:{ color:'rgba(255,255,255,0.04)' } }
+        }
+      }
+    });
+  } catch(e) {}
+}
+
+// ── Model tab ──
+async function loadModelMetrics() {
+  try {
+    const d = await fetchJSON('/api/model_metrics');
+    const cm = d.confusion_matrix;
+    // cm = [[TN, FP], [FN, TP]]
+    const tn = cm[0][0], fp = cm[0][1], fn = cm[1][0], tp = cm[1][1];
+
+    document.getElementById('cm-grid').innerHTML = `
+      <div class="cm-cell cm-tn"><div class="cm-lbl">TN</div><div class="cm-val">${tn}</div><div class="cm-desc">Correct normal</div></div>
+      <div class="cm-cell cm-fp"><div class="cm-lbl">FP</div><div class="cm-val">${fp}</div><div class="cm-desc">False alarm</div></div>
+      <div class="cm-cell cm-fn"><div class="cm-lbl">FN</div><div class="cm-val">${fn}</div><div class="cm-desc">Missed failure!</div></div>
+      <div class="cm-cell cm-tp"><div class="cm-lbl">TP</div><div class="cm-val">${tp}</div><div class="cm-desc">Correct failure</div></div>`;
+
+    document.getElementById('metrics-list').innerHTML = [
+      { label:'Accuracy',  val: d.accuracy  + '%', cls:'val-good' },
+      { label:'Precision', val: d.precision + '%', cls:'val-good' },
+      { label:'Recall ← most important!', val: d.recall + '%', cls:'val-good' },
+      { label:'F1 Score',  val: d.f1 + '%',        cls:'val-info' },
+    ].map(m => `<div class="metric-row"><span class="label">${m.label}</span><span class="val ${m.cls}">${m.val}</span></div>`).join('');
+
+    drawFIChart(d.feature_importance);
+  } catch(e) { console.error('model metrics:', e); }
+}
+
+function drawFIChart(fi) {
+  if (fiChart) fiChart.destroy();
+  const ctx = document.getElementById('fi-chart').getContext('2d');
+  fiChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: fi.map(f => f.feature).reverse(),
+      datasets: [{
+        data: fi.map(f => f.score).reverse(),
+        backgroundColor: 'rgba(99,102,241,0.7)',
+        borderColor: '#6366f1', borderWidth: 1, borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color:'#8892a4', font:{size:10} }, grid:{ color:'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color:'#8892a4', font:{size:10} }, grid:{ color:'rgba(255,255,255,0.04)' } }
+      }
+    }
+  });
+}
+
+// ── Alerts tab ──
+async function loadAlerts() {
+  try {
+    const data = await fetchJSON('/api/fleet');
+    const critical = data.filter(e => e.status === 'critical');
+    const warnings = data.filter(e => e.status === 'warning');
+    const alerts   = [...critical, ...warnings];
+
+    const log = document.getElementById('alert-log');
+    if (!alerts.length) {
+      log.innerHTML = '<div class="loading" style="color:var(--green)">No alerts — all engines healthy</div>';
+    } else {
+      log.innerHTML = alerts.map((e, i) => {
+        const color  = e.status === 'critical' ? 'var(--red)' : 'var(--amber)';
+        const msg    = e.status === 'critical'
+          ? `Engine #${String(e.unit_id).padStart(3,'0')} — CRITICAL: ${e.fail_prob}% failure probability`
+          : `Engine #${String(e.unit_id).padStart(3,'0')} — WARNING: ${e.fail_prob}% failure probability`;
+        const sub    = e.status === 'critical'
+          ? 'Immediate shutdown recommended'
+          : `Schedule maintenance within ${e.rul} cycles`;
+        return `<div class="alert-item">
+          <div class="alert-dot" style="background:${color}"></div>
+          <div>
+            <div class="alert-msg">${msg}</div>
+            <div class="alert-sub">${sub} | RUL: ${e.rul} cycles | Cycle ${e.cycle}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    drawProbDistChart(data);
+  } catch(e) { console.error('alerts:', e); }
+}
+
+function drawProbDistChart(data) {
+  if (probDistChart) probDistChart.destroy();
+  const buckets = new Array(10).fill(0);
+  data.forEach(e => { const i = Math.min(9, Math.floor(e.fail_prob / 10)); buckets[i]++; });
+  const ctx = document.getElementById('prob-dist-chart').getContext('2d');
+  probDistChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['0-10%','10-20%','20-30%','30-40%','40-50%','50-60%','60-70%','70-80%','80-90%','90-100%'],
+      datasets: [{
+        label: 'Engines',
+        data: buckets,
+        backgroundColor: buckets.map((_, i) =>
+          i >= 8 ? 'rgba(239,68,68,0.8)' : i >= 5 ? 'rgba(245,158,11,0.7)' : 'rgba(34,197,94,0.7)'
+        ),
+        borderWidth: 0, borderRadius: 4,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color:'#8892a4', font:{size:10}, maxRotation:45 }, grid:{ color:'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color:'#8892a4', font:{size:11} }, grid:{ color:'rgba(255,255,255,0.04)' } }
+      }
+    }
+  });
+}
+
+// ── Init ──
+document.addEventListener('DOMContentLoaded', () => {
+  refreshAll();
+});
+</script>
+</body>
+</html>
